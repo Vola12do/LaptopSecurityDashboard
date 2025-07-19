@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laptop Security Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --background: #f1f5f9; --card-bg: white; --text-primary: #1e293b; --text-secondary: #64748b; --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); --border-color: #e2e8f0;
+        }
+        html.dark {
+            --background: #0f172a; --card-bg: #1e293b; --text-primary: #e2e8f0; --text-secondary: #94a3b8; --card-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.2), 0 4px 6px -4px rgb(0 0 0 / 0.2); --border-color: #334155;
+        }
+        body { font-family: 'Poppins', sans-serif; background-color: var(--background); color: var(--text-primary); transition: background-color 0.3s ease, color 0.3s ease; }
+        .card { background-color: var(--card-bg); border-radius: 1rem; box-shadow: var(--card-shadow); transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease; }
+        .card:hover { transform: translateY(-5px); }
+        .icon-bg { padding: 0.75rem; border-radius: 0.75rem; display: inline-flex; align-items: center; justify-content: center; }
+        .table-header { background-color: var(--background); }
+        .table-row-border { border-color: var(--border-color); }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="mb-8">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold" style="color: var(--text-primary);">Security Overview</h1>
+                    <p class="mt-1" style="color: var(--text-secondary);">Real-time health analysis of your device.</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                         <p class="text-sm" style="color: var(--text-secondary);">Last Scan</p>
+                         <p id="last-updated" class="font-semibold" style="color: var(--text-primary);">Waiting for data...</p>
+                    </div>
+                    <button id="theme-toggle" class="p-2 rounded-lg" style="background-color: var(--card-bg); color: var(--text-primary);">
+                        <svg id="theme-toggle-dark-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+                        <svg id="theme-toggle-light-icon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 14.95a1 1 0 010-1.414l.707-.707a1 1 0 011.414 1.414l-.707.707a1 1 0 01-1.414 0zM3 11a1 1 0 100-2H2a1 1 0 100 2h1z"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+        <main id="dashboard-content" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Content will be injected by JavaScript -->
+        </main>
+    </div>
+
+    <script>
+        let dashboardData = null;
+        let fileHealthChart = null;
+        const themeToggle = document.getElementById('theme-toggle');
+        const darkIcon = document.getElementById('theme-toggle-dark-icon');
+        const lightIcon = document.getElementById('theme-toggle-light-icon');
+
+        function setInitialTheme() {
+            if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                lightIcon.classList.remove('hidden');
+            } else {
+                document.documentElement.classList.remove('dark');
+                darkIcon.classList.remove('hidden');
+            }
+        }
+        setInitialTheme();
+
+        themeToggle.addEventListener('click', () => {
+            darkIcon.classList.toggle('hidden');
+            lightIcon.classList.toggle('hidden');
+            document.documentElement.classList.toggle('dark');
+            if (document.documentElement.classList.contains('dark')) {
+                localStorage.setItem('color-theme', 'dark');
+            } else {
+                localStorage.setItem('color-theme', 'light');
+            }
+            if (dashboardData) renderFileHealthChart(dashboardData.file_integrity);
+        });
+
+        function renderDashboard(data) {
+            dashboardData = data;
+            document.getElementById('last-updated').textContent = new Date(data.last_updated).toLocaleString();
+            const mainContent = document.getElementById('dashboard-content');
+            mainContent.innerHTML = `
+                <div class="flex flex-col gap-6">
+                    <div class="card p-6 flex flex-col items-center justify-center text-center"><div id="health-score-icon" class="icon-bg"></div><h2 class="text-lg font-semibold mt-4" style="color: var(--text-primary);">Overall Health Score</h2><div id="health-score" class="text-7xl font-bold my-2">--</div><p id="health-status-text" class="font-medium" style="color: var(--text-secondary);">Calculating...</p></div>
+                    <div class="card p-6"><h2 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">System Resources</h2><div id="system-resources" class="space-y-4"></div></div>
+                </div>
+                <div class="flex flex-col gap-6">
+                    <div class="card p-6"><h2 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">File Integrity</h2><div><canvas id="file-health-chart"></canvas></div></div>
+                    <div class="card p-6"><h2 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">Recent File Scans</h2><div id="file-scan-table" class="overflow-auto max-h-48 text-sm"></div></div>
+                </div>
+                <div class="flex flex-col gap-6">
+                    <div class="card p-6"><h2 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">System Information</h2><div id="os-info" class="space-y-3 text-sm"></div></div>
+                    <div class="card p-6"><h2 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">High-Resource Processes</h2><div id="processes-table" class="overflow-auto max-h-64 text-sm"></div></div>
+                </div>
+                <div class="lg:col-span-3 card p-6"><h2 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">Active Network Connections</h2><div id="network-table" class="overflow-x-auto max-h-64"></div></div>
+            `;
+            updateHealthScore(data.health_score);
+            updateSystemResources(data.system_resources);
+            updateOSInfo(data.os_info);
+            updateProcesses(data.running_processes);
+            updateNetworkConnections(data.network_connections);
+            updateFileIntegrity(data.file_integrity);
+            renderFileHealthChart(data.file_integrity);
+        }
+
+        function updateHealthScore(score) { /* ... same as before ... */ }
+        function updateSystemResources(resources) { /* ... same as before ... */ }
+        function updateOSInfo(osInfo) { /* ... same as before ... */ }
+        function createTable(headers, dataRows) { /* ... same as before ... */ }
+        function updateProcesses(processes) { /* ... same as before ... */ }
+        function updateNetworkConnections(connections) { /* ... same as before ... */ }
+        function updateFileIntegrity(integrityData) { /* ... same as before ... */ }
+        function renderFileHealthChart(fileHealth) { /* ... same as before ... */ }
+        
+        // Functions from previous version, adapted for clarity
+        updateHealthScore = function(score) {
+            const scoreEl = document.getElementById('health-score');
+            const statusEl = document.getElementById('health-status-text');
+            const iconContainer = document.getElementById('health-score-icon');
+            scoreEl.textContent = score;
+            let statusText, colorClass, icon;
+            if (score < 50) { [statusText, colorClass] = ['Action Required', 'red']; icon = `<svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`; } 
+            else if (score < 80) { [statusText, colorClass] = ['Fair Condition', 'yellow']; icon = `<svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`; } 
+            else { [statusText, colorClass] = ['System Secure', 'green']; icon = `<svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`; }
+            statusEl.textContent = statusText;
+            scoreEl.className = `text-7xl font-bold my-2 text-${colorClass}-500`;
+            iconContainer.className = `icon-bg bg-${colorClass}-100 text-${colorClass}-600`;
+            iconContainer.innerHTML = icon;
+        };
+        updateSystemResources = function(resources) { document.getElementById('system-resources').innerHTML = `<div><div class="flex justify-between mb-1 text-sm font-medium" style="color: var(--text-secondary);"><span>CPU Usage</span><span>${resources.cpu_percent}%</span></div><div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5"><div class="bg-blue-500 h-2.5 rounded-full" style="width: ${resources.cpu_percent}%"></div></div></div><div><div class="flex justify-between mb-1 text-sm font-medium" style="color: var(--text-secondary);"><span>Memory Usage</span><span>${resources.memory_percent}% (${resources.memory_used_gb} / ${resources.memory_total_gb} GB)</span></div><div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5"><div class="bg-indigo-500 h-2.5 rounded-full" style="width: ${resources.memory_percent}%"></div></div></div><div><div class="flex justify-between mb-1 text-sm font-medium" style="color: var(--text-secondary);"><span>Disk Usage</span><span>${resources.disk_percent}%</span></div><div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5"><div class="bg-purple-500 h-2.5 rounded-full" style="width: ${resources.disk_percent}%"></div></div></div>`; };
+        updateOSInfo = function(osInfo) { document.getElementById('os-info').innerHTML = `<div class="flex justify-between items-center"><span style="color: var(--text-secondary);">OS</span><span class="font-semibold text-right" style="color: var(--text-primary);">${osInfo.name}</span></div><div class="flex justify-between items-center"><span style="color: var(--text-secondary);">Architecture</span><span class="font-semibold text-right" style="color: var(--text-primary);">${osInfo.architecture}</span></div><div class="flex justify-between items-center"><span style="color: var(--text-secondary);">Last Update</span><span class="font-semibold text-right" style="color: var(--text-primary);">${osInfo.last_update}</span></div>`; };
+        createTable = function(headers, dataRows) { let table = `<table class="min-w-full text-sm"><thead class="table-header"><tr class="border-b table-row-border">`; headers.forEach(h => table += `<th class="text-left p-3 font-semibold" style="color: var(--text-secondary);">${h}</th>`); table += `</tr></thead><tbody class="divide-y table-row-border">`; table += dataRows.join(''); table += `</tbody></table>`; return table; };
+        updateProcesses = function(processes) { const headers = ['PID', 'Name', 'CPU %']; const rows = processes.map(p => `<tr><td class="p-2" style="color: var(--text-secondary);">${p.pid}</td><td class="p-2 font-medium" style="color: var(--text-primary);">${p.name}</td><td class="p-2" style="color: var(--text-secondary);">${p.cpu}</td></tr>`); document.getElementById('processes-table').innerHTML = createTable(headers, rows); };
+        updateNetworkConnections = function(connections) { const headers = ['Protocol', 'Local Address', 'Remote Address', 'Status']; const rows = connections.map(c => `<tr><td class="p-2" style="color: var(--text-primary);">${c.protocol}</td><td class="p-2" style="color: var(--text-primary);">${c.local_address}</td><td class="p-2" style="color: var(--text-primary);">${c.remote_address}</td><td class="p-2"><span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">${c.status}</span></td></tr>`); document.getElementById('network-table').innerHTML = createTable(headers, rows);};
+        updateFileIntegrity = function(integrityData) { const headers = ['File', 'Hash', 'Status']; const rows = integrityData.scanned_files.map(f => `<tr><td class="p-2 font-medium" style="color: var(--text-primary);">${f.path}</td><td class="p-2 font-mono text-xs" style="color: var(--text-secondary);">${f.hash}</td><td class="p-2 text-green-500">${f.status}</td></tr>`); document.getElementById('file-scan-table').innerHTML = createTable(headers, rows); };
+        renderFileHealthChart = function(fileHealth) {
+            const { genuine, suspicious, dangerous } = fileHealth;
+            const ctx = document.getElementById('file-health-chart').getContext('2d');
+            if(fileHealthChart) fileHealthChart.destroy();
+            fileHealthChart = new Chart(ctx, { type: 'doughnut', data: { labels: ['Genuine', 'Suspicious', 'Dangerous'], datasets: [{ data: [genuine, suspicious, dangerous], backgroundColor: ['#10B981', '#F59E0B', '#EF4444'], borderColor: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff', borderWidth: 4, hoverOffset: 8 }] }, options: { responsive: true, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { padding: 20, color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b', font: { size: 14, family: "'Poppins', sans-serif" } } } } } });
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            function fetchData() {
+                fetch('https://hello1235.pythonanywhere.com/api/health')
+                    .then(response => {
+                        if (!response.ok) throw new Error('Could not connect to backend server.');
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.status === "No data received yet. Run the collector_live.py script on your machine.") {
+                            document.getElementById('dashboard-content').innerHTML = `<div class="lg:col-span-3 card p-6 text-center"><h2 class="text-xl font-semibold">Waiting for data...</h2><p class="mt-2" style="color: var(--text-secondary);">Please start the collector.py script on the machine you want to monitor. The dashboard will update automatically.</p></div>`;
+                        } else {
+                            renderDashboard(data);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading dashboard data:', error);
+                        document.getElementById('dashboard-content').innerHTML = `<div class="lg:col-span-3 card p-6 text-center bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200"><h2 class="text-xl font-semibold">Connection Error</h2><p class="mt-2">Could not connect to the backend server. Please ensure the 'python app.py' server is running and accessible.</p></div>`;
+                    });
+            }
+            fetchData();
+            setInterval(fetchData, 5000); // Refresh data every 5 seconds
+        });
+    </script>
+</body>
+</html>
